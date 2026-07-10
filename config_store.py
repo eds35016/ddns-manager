@@ -105,6 +105,18 @@ def _merge_defaults(cfg, defaults):
     return cfg
 
 
+def _migrate_webhooks(cfg):
+    """Older configs stored discord_webhook_urls as a plain list of URL
+    strings. Upgrade each entry to {"url", "ping_user_ids"} in place so the
+    rest of the app only ever deals with one shape."""
+    webhooks = cfg.get("discord_webhook_urls", [])
+    cfg["discord_webhook_urls"] = [
+        {"url": w, "ping_user_ids": []} if isinstance(w, str) else w
+        for w in webhooks
+    ]
+    return cfg
+
+
 def load_config():
     """Load config.json, creating it with generated credentials on first run.
 
@@ -120,6 +132,7 @@ def load_config():
                 _config = _merge_defaults(json.load(f), DEFAULT_CONFIG)
         else:
             _config = copy.deepcopy(DEFAULT_CONFIG)
+        _migrate_webhooks(_config)
 
         changed = False
         if not _config["admin_password_hash"]:

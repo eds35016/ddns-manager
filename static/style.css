@@ -227,15 +227,18 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 
 .webhook-list { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
 .webhook-list li {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
   padding: var(--sp-2) 0; border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere;
 }
 .webhook-list li:last-child { border-bottom: none; }
+.webhook-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+}
 .webhook-remove {
   display: flex; align-items: center; gap: var(--sp-1);
   color: var(--text-muted); font-size: var(--fs-sm); white-space: nowrap; cursor: pointer;
 }
+.webhook-ping { margin: var(--sp-2) 0 0; }
 
 /* ----------------------------- login page ------------------------------- */
 

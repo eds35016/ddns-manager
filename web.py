@@ -512,6 +512,18 @@ def create_app():
         wid = tail[-2] if len(tail) >= 2 else "?"
         return f"…/webhooks/{wid}/…{url[-4:]}"
 
+    def _parse_discord_user_ids(raw, errors):
+        """Parse a comma/space-separated list of Discord user IDs (snowflakes)."""
+        ids = []
+        for part in re.split(r"[,\s]+", raw.strip()):
+            if not part:
+                continue
+            if not re.fullmatch(r"\d{15,25}", part):
+                errors.append(f"Not a valid Discord user ID: {part}")
+            elif part not in ids:
+                ids.append(part)
+        return ids
+
     @app.route("/settings")
     @login_required
     def settings():
@@ -520,8 +532,9 @@ def create_app():
             "settings.html",
             cfg=cfg,
             has_token=bool(cfg.get("cloudflare_api_token")),
-            webhooks_masked=[_mask_webhook(u)
-                             for u in cfg.get("discord_webhook_urls", [])],
+            webhooks=[{"masked": _mask_webhook(w["url"]),
+                       "ping_user_ids": ", ".join(w.get("ping_user_ids", []))}
+                      for w in cfg.get("discord_webhook_urls", [])],
             to_addrs_joined=", ".join(cfg.get("smtp", {}).get("to_addrs", [])),
             has_smtp_password=bool(cfg.get("smtp", {}).get("password")),
         )
@@ -550,22 +563,35 @@ def create_app():
         if token:
             changes["cloudflare_api_token"] = token
 
-        # Discord webhooks: keep the saved list minus any checked for removal,
-        # then append new ones (textarea, one per line).
+        # Discord webhooks: keep the saved list minus any checked for removal
+        # (picking up each row's edited ping user IDs along the way), then
+        # append new ones (textarea, one per line).
         webhooks = list(cfg.get("discord_webhook_urls", []))
         remove_idx = {int(i) for i in form.getlist("remove_webhook")
                       if i.isdigit()}
-        webhooks = [u for i, u in enumerate(webhooks) if i not in remove_idx]
-        for line in form.get("new_webhooks", "").splitlines():
-            url = line.strip()
-            if not url:
+        ping_id_inputs = form.getlist("webhook_ping_ids")
+        kept_webhooks = []
+        existing_urls = set()
+        for i, w in enumerate(webhooks):
+            if i in remove_idx:
                 continue
+            raw_ids = ping_id_inputs[i] if i < len(ping_id_inputs) else ""
+            kept_webhooks.append({"url": w["url"],
+                                  "ping_user_ids": _parse_discord_user_ids(raw_ids, errors)})
+            existing_urls.add(w["url"])
+        for line in form.get("new_webhooks", "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            url, _, raw_ids = line.partition(" ")
             if not url.startswith("https://discord.com/api/webhooks/") and \
                not url.startswith("https://discordapp.com/api/webhooks/"):
                 errors.append(f"Not a Discord webhook URL: {url[:40]}…")
-            elif url not in webhooks:
-                webhooks.append(url)
-        changes["discord_webhook_urls"] = webhooks
+            elif url not in existing_urls:
+                kept_webhooks.append({"url": url,
+                                      "ping_user_ids": _parse_discord_user_ids(raw_ids, errors)})
+                existing_urls.add(url)
+        changes["discord_webhook_urls"] = kept_webhooks
 
         smtp_changes = {}
         smtp_host = form.get("smtp_host", "").strip()

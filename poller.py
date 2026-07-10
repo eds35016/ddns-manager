@@ -65,7 +65,10 @@ def get_public_ips():
     return ipv4, ipv6
 
 
-def send_discord_notification(webhook_url, message):
+def send_discord_notification(webhook_url, message, ping_user_ids=None):
+    if ping_user_ids:
+        mentions = " ".join(f"<@{uid}>" for uid in ping_user_ids)
+        message = f"{mentions}\n{message}"
     if len(message) > DISCORD_MESSAGE_LIMIT:
         message = message[: DISCORD_MESSAGE_LIMIT - 25] + "\n… (message truncated)"
     resp = requests.post(webhook_url, json={"content": message}, timeout=(5, 10))
@@ -142,14 +145,15 @@ def _notify(config, message, subject="DDNS: public IP change detected"):
     if webhooks:
         sent = 0
         last_error = None
-        for url in webhooks:
+        webhook_urls = [w["url"] for w in webhooks]
+        for w in webhooks:
             try:
-                send_discord_notification(url, message)
+                send_discord_notification(w["url"], message, w.get("ping_user_ids"))
                 sent += 1
             except requests.RequestException as exc:
                 # requests error text includes the webhook URL, whose path IS
                 # the secret token — redact before logging or displaying.
-                last_error = _redact_webhooks(str(exc), webhooks)
+                last_error = _redact_webhooks(str(exc), webhook_urls)
                 log.error("Discord notification failed: %s", last_error)
         if sent == len(webhooks):
             status["discord"] = "sent" if sent == 1 else f"sent to {sent} webhooks"

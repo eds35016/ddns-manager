@@ -10,8 +10,8 @@
   "cloudflare_zone_id": "(32-char hex ID from the Cloudflare zone Overview page)",
   "ddns_tracked_record_ids": ["(Cloudflare record IDs toggled on in the DNS Records page)"],
   "discord_webhook_urls": [
-    "https://discord.com/api/webhooks/...",
-    "https://discord.com/api/webhooks/... (every webhook gets each notification)"
+    {"url": "https://discord.com/api/webhooks/...", "ping_user_ids": ["123456789012345678"]},
+    {"url": "https://discord.com/api/webhooks/... (every webhook gets each notification)", "ping_user_ids": []}
   ],
   "smtp": {
     "host": "mail.yourprovider.com",

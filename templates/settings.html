@@ -47,12 +47,19 @@
     </div>
 
     <h3>Discord webhooks</h3>
-    {% if webhooks_masked %}
+    {% if webhooks %}
     <ul class="webhook-list">
-      {% for masked in webhooks_masked %}
+      {% for wh in webhooks %}
       <li>
-        <span class="mono">{{ masked }}</span>
-        <label class="webhook-remove"><input type="checkbox" name="remove_webhook" value="{{ loop.index0 }}"> remove</label>
+        <div class="webhook-row">
+          <span class="mono">{{ wh.masked }}</span>
+          <label class="webhook-remove"><input type="checkbox" name="remove_webhook" value="{{ loop.index0 }}"> remove</label>
+        </div>
+        <div class="field webhook-ping">
+          <label for="ping-ids-{{ loop.index0 }}">Ping user ID(s) <span class="muted">(comma-separated, optional)</span></label>
+          <input id="ping-ids-{{ loop.index0 }}" name="webhook_ping_ids" type="text" class="mono"
+                 value="{{ wh.ping_user_ids }}" placeholder="e.g. 123456789012345678">
+        </div>
       </li>
       {% endfor %}
     </ul>
@@ -60,9 +67,10 @@
     <p class="muted">No webhooks yet — every webhook you add gets each notification.</p>
     {% endif %}
     <div class="field">
-      <label for="new-webhooks">Add webhook(s) <span class="muted">(one per line)</span></label>
+      <label for="new-webhooks">Add webhook(s) <span class="muted">(one per line — optionally followed by a space and Discord user ID(s) to ping)</span></label>
       <textarea id="new-webhooks" name="new_webhooks" rows="2" class="mono"
-                placeholder="https://discord.com/api/webhooks/…"></textarea>
+                placeholder="https://discord.com/api/webhooks/… 123456789012345678,234567890123456789"></textarea>
+      <p class="field-hint">To find a Discord user ID: in Discord, enable <strong>User Settings → Advanced → Developer Mode</strong>, then right-click a user and choose "Copy User ID". Pinged users must be members of the server the webhook posts to.</p>
     </div>
 
     <h3>Email (SMTP)</h3>

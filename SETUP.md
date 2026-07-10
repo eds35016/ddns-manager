@@ -49,7 +49,7 @@ You normally never edit this file — everything except the bind address/port is
 | `cloudflare_api_token`                     | API token, scope**Zone → DNS → Edit** (optional — blank = notification-only mode)                 | —                     |
 | `cloudflare_zone_id`                       | 32-char hex zone ID (optional — blank = notification-only mode)                                           | —                     |
 | `ddns_tracked_record_ids`                  | Record IDs auto-updated with your IP                                                                       | `[]`                 |
-| `discord_webhook_urls`                     | List of Discord webhooks — each gets every notification                                                   | `[]`                 |
+| `discord_webhook_urls`                     | List of `{url, ping_user_ids}` — each webhook gets every notification, optionally @-mentioning its own list of Discord user IDs | `[]`                 |
 | `smtp.*`                                   | Email: host, port, security (`starttls`/`ssl`/`none`), username, password, from, `to_addrs` (list) | port 587 starttls      |
 | `notifications_enabled`                    | Master switch for both channels                                                                            | `true`               |
 | `notify_on_errors`                         | Alert once when IP lookup / Cloudflare access starts failing, and once on recovery                         | `true`               |
@@ -76,6 +76,7 @@ You normally never edit this file — everything except the bind address/port is
 1. In your Discord server: **Server Settings → Integrations → Webhooks → New Webhook**.
 2. Pick the channel that should receive IP-change alerts, copy the **Webhook URL**.
 3. Paste it into the GUI's Settings page later. You can add **as many webhooks as you like** (different channels or servers) — every webhook receives each notification.
+4. Optionally, give each webhook its own list of **Discord user IDs** to @-mention on every notification it sends — handy if different webhooks post to different servers with different people to alert. To find a user ID: enable **User Settings → Advanced → Developer Mode**, then right-click a user and **Copy User ID**. The pinged user must be a member of the server the webhook posts to.
 
 ## Part 3 — Email (SMTP)
 
