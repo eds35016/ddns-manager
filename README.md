@@ -16,7 +16,7 @@ A self-hosted DDNS client **and** full Cloudflare DNS manager, wrapped in a sing
 
 Most DDNS clients are single-purpose CLI tools that only touch one record and offer no visibility into whether an update worked. This project started from wanting that reliability (dual notifications, success/failure reporting, auto-recovery from a bad token) plus a real DNS management UI, so a Raspberry Pi/Orange Pi/old laptop on the LAN can be the one place you manage your domain — not the Cloudflare dashboard, and not a fragile bash script in a cron job.
 
-## Screenshots
+## Web GUI
 
 _Dashboard, DNS record manager, and settings pages — run it locally (see below) to see the current look; both light and dark themes are supported._
 
