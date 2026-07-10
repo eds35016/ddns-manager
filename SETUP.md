@@ -2,10 +2,12 @@
 
 A single service, meant to run on any always-on Linux box on your home network (Raspberry Pi, Orange Pi, an old laptop, a VM — anything that stays powered on), that:
 
-1. **Monitors your public IP** (IPv4 and IPv6) on a schedule you choose.
+1. **Monitors your public IP** (IPv4 and IPv6) on a schedule you choose, keeping a full history of past addresses and when each was active (SQLite, browsable on the dashboard, exportable as CSV).
 2. **Updates Cloudflare DNS records** you've flagged for auto-update whenever the IP changes.
 3. **Notifies you via Discord and email** (multiple webhooks / recipients supported), including whether each DNS update succeeded — plus a one-time alert if the service itself runs into trouble (IP lookup failing, Cloudflare unreachable) and a notice when it recovers.
 4. **Hosts a local web GUI** on your LAN for managing *all* your Cloudflare DNS records (create/edit/delete any type, proxied or not) and for changing every setting live — no service restart needed.
+
+Cloudflare is **optional**: leave the token/Zone ID blank and the service runs in **notification-only mode** — IP changes are still detected and announced via Discord/email, they just don't update any DNS records. You can add Cloudflare later at any time from Settings.
 
 ---
 
@@ -27,9 +29,11 @@ If your Cloudflare token ever becomes invalid, the service **keeps running** —
 | `web.py`                  | Flask routes (GUI + JSON API)                                  |
 | `cloudflare_client.py`    | Cloudflare API wrapper                                         |
 | `config_store.py`         | Config/state persistence (atomic writes)                       |
+| `ip_history.py`           | SQLite log of past public IPs and their active ranges          |
 | `templates/`, `static/` | Web GUI                                                        |
 | `config.json`             | **Created on first run.** Settings + secrets (chmod 600) |
 | `state.json`              | Created at runtime. Last IP / status for the dashboard         |
+| `history.db`              | Created at runtime. The IP history database                    |
 | `ddns-manager.service`    | systemd unit                                                   |
 
 ### Configuration reference (`config.json`)
@@ -42,8 +46,8 @@ You normally never edit this file — everything except the bind address/port is
 | `session_secret`                           | Signs session cookies                                                                                      | generated              |
 | `bind_host` / `bind_port`                | Where the GUI listens (restart to change)                                                                  | `0.0.0.0` / `8080` |
 | `poll_interval_seconds`                    | IP check interval (60–86400)                                                                              | `300`                |
-| `cloudflare_api_token`                     | API token, scope**Zone → DNS → Edit**                                                              | —                     |
-| `cloudflare_zone_id`                       | 32-char hex zone ID                                                                                        | —                     |
+| `cloudflare_api_token`                     | API token, scope**Zone → DNS → Edit** (optional — blank = notification-only mode)                 | —                     |
+| `cloudflare_zone_id`                       | 32-char hex zone ID (optional — blank = notification-only mode)                                           | —                     |
 | `ddns_tracked_record_ids`                  | Record IDs auto-updated with your IP                                                                       | `[]`                 |
 | `discord_webhook_urls`                     | List of Discord webhooks — each gets every notification                                                   | `[]`                 |
 | `smtp.*`                                   | Email: host, port, security (`starttls`/`ssl`/`none`), username, password, from, `to_addrs` (list) | port 587 starttls      |
@@ -52,7 +56,7 @@ You normally never edit this file — everything except the bind address/port is
 
 ---
 
-## Part 1 — Cloudflare setup (do this first, from any machine)
+## Part 1 — Cloudflare setup (optional, skip this for notification-only mode)
 
 1. **Create a scoped API token** (do *not* use the Global API Key):
    - Cloudflare dashboard → profile icon → **My Profile → API Tokens → Create Token**.

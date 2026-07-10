@@ -6,7 +6,7 @@
   "bind_host": "0.0.0.0",
   "bind_port": 8080,
   "poll_interval_seconds": 300,
-  "cloudflare_api_token": "(set via the web GUI — token scoped to Zone / DNS / Edit)",
+  "cloudflare_api_token": "(set via the web GUI — token scoped to Zone / DNS / Edit; leave blank for notification-only mode)",
   "cloudflare_zone_id": "(32-char hex ID from the Cloudflare zone Overview page)",
   "ddns_tracked_record_ids": ["(Cloudflare record IDs toggled on in the DNS Records page)"],
   "discord_webhook_urls": [

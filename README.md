@@ -9,6 +9,8 @@ A self-hosted DDNS client **and** full Cloudflare DNS manager, wrapped in a sing
 - **Watches your public IPv4/IPv6** on a schedule you choose (default every 5 minutes, live-adjustable) and keeps the Cloudflare DNS records you flag in sync with it.
 - **Manages your entire Cloudflare zone** from the browser — create, edit, and delete any record type (A, AAAA, CNAME, TXT, MX, SRV, CAA, and others via a raw-JSON fallback), proxied or not — so you rarely need to open the Cloudflare dashboard.
 - **Notifies you** via any number of Discord webhooks and email recipients whenever your IP changes, including whether each DNS update actually succeeded — plus a one-time alert (and a recovery notice) if the service itself runs into trouble, e.g. IP lookup failing or Cloudflare being unreachable.
+- **Works without Cloudflare too.** Leave the Cloudflare fields blank and it runs in **notification-only mode**: IP changes are still detected and announced via Discord/email, just without touching any DNS records.
+- **Keeps a full IP history** in a local SQLite database — every past address with the date/time range it was active, browsable from the dashboard (filterable by IPv4/IPv6) and exportable as CSV.
 - **Applies every setting live.** Poll interval, credentials, tracked records, notification targets — all editable from Settings with no service restart.
 - Ships as **one systemd service**: a background poller thread plus a Flask + Waitress web server in a single process.
 
@@ -23,7 +25,7 @@ _Dashboard, DNS record manager, and settings pages — run it locally (see below
 ## Requirements
 
 - Python 3.9+
-- A domain on Cloudflare (free tier is fine) and an API token scoped to **Zone → DNS → Edit**
+- Optionally: a domain on Cloudflare (free tier is fine) and an API token scoped to **Zone → DNS → Edit** — without it the service runs in notification-only mode
 - Optionally: a Discord webhook and/or an SMTP mailbox for notifications
 - Any always-on Linux machine on your network for the real deployment (Raspberry Pi, Orange Pi, a spare mini-PC, a VM — it's lightweight enough for a Zero-class SBC)
 

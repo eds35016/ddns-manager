@@ -13,9 +13,11 @@
 </div>
 
 {% if not configured %}
-<div class="banner banner-warn">
-  Cloudflare isn't connected yet — add your API token and Zone ID in
-  <a href="{{ url_for('settings') }}">Settings</a> to start managing DNS.
+<div class="banner banner-info">
+  Cloudflare isn't connected — running in <strong>notification-only mode</strong>:
+  IP changes are still detected and announced via Discord/email, but no DNS
+  records are updated. Add your API token and Zone ID in
+  <a href="{{ url_for('settings') }}">Settings</a> to manage DNS too.
 </div>
 {% endif %}
 
@@ -74,6 +76,53 @@
   {% endif %}
 </section>
 
+<section class="card" id="ip-history">
+  <div class="card-head">
+    <h2>IP address history</h2>
+    {% if history or history_family %}
+    <div class="card-head-actions">
+      <nav class="filter-tabs" aria-label="Filter IP history by address family">
+        <a href="{{ url_for('dashboard') }}#ip-history" class="{{ 'active' if not history_family }}">All IPs</a>
+        <a href="{{ url_for('dashboard', family='IPv4') }}#ip-history" class="{{ 'active' if history_family == 'IPv4' }}">IPv4</a>
+        <a href="{{ url_for('dashboard', family='IPv6') }}#ip-history" class="{{ 'active' if history_family == 'IPv6' }}">IPv6</a>
+      </nav>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('ip_history_csv') }}">Download CSV</a>
+    </div>
+    {% endif %}
+  </div>
+  {% if history %}
+  <div class="table-scroll">
+    <table class="history-table">
+      <thead>
+        <tr><th>Type</th><th>IP address</th><th>Active from</th><th>Active until</th></tr>
+      </thead>
+      <tbody id="history-body">
+        {% for h in history %}
+        <tr>
+          <td><span class="badge badge-{{ 'A' if h.family == 'IPv4' else 'AAAA' }}">{{ h.family }}</span></td>
+          <td class="mono">{{ h.ip }}</td>
+          <td>{{ h.started_ts|ts }}</td>
+          <td>{% if h.ended_ts %}{{ h.ended_ts|ts }}{% else %}<span class="chip chip-ok">active</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="history-actions">
+    <button type="button" class="btn btn-secondary" id="history-more-btn"
+            data-before="{{ history[-1].id }}" data-family="{{ history_family or '' }}"
+            {% if not history_more %}hidden{% endif %}>
+      <span class="btn-label">Show more</span>
+      <span class="spinner" hidden aria-hidden="true"></span>
+    </button>
+  </div>
+  {% elif history_family %}
+  <p class="muted">No {{ history_family }} entries yet.</p>
+  {% else %}
+  <p class="muted">No IP history yet — the first entry appears after the next successful IP check.</p>
+  {% endif %}
+</section>
+
 <section class="card">
   <h2>Notifications</h2>
   <div class="notify-status">
@@ -88,6 +137,6 @@
         {{ state.notify.email or 'nothing sent yet' }}</span>
     </div>
   </div>
-  <p class="muted">Both channels are notified whenever your IP changes, including whether each DNS update succeeded.</p>
+  <p class="muted">Both channels are notified whenever your IP changes. When DNS records are tracked, the message also reports whether each update succeeded.</p>
 </section>
 {% endblock %}

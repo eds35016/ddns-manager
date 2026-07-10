@@ -7,7 +7,9 @@ flows work as plain form POST + redirect; static/app.js layers on modals,
 polling, and toasts.
 """
 
+import csv
 import functools
+import io
 import ipaddress
 import json
 import logging
@@ -17,14 +19,15 @@ import time
 from datetime import timedelta
 from urllib.parse import urlparse
 
-from flask import (Flask, abort, flash, jsonify, redirect, render_template,
-                   request, session, url_for)
+from flask import (Flask, Response, abort, flash, jsonify, redirect,
+                   render_template, request, session, url_for)
 from flask_wtf import CSRFProtect
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import cloudflare_client as cf
 import config_store
+import ip_history
 import poller
 
 log = logging.getLogger(__name__)
@@ -47,6 +50,14 @@ HOSTNAME_RE = re.compile(
 TTL_CHOICES = [1, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 28800, 86400]
 
 FORM_RECORD_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "SRV", "CAA"]
+
+HISTORY_PAGE_SIZE = 20
+
+
+def _history_family():
+    """Validated ?family= filter — 'IPv4', 'IPv6', or None for all."""
+    fam = request.args.get("family", "")
+    return fam if fam in ("IPv4", "IPv6") else None
 
 
 def _client_ip():
@@ -334,12 +345,17 @@ def create_app():
     def dashboard():
         cfg = config_store.get_config()
         state = config_store.get_state()
+        family = _history_family()
+        history, history_more = ip_history.get_page(
+            limit=HISTORY_PAGE_SIZE, family=family)
         return render_template(
             "dashboard.html", state=state,
             tracked_count=len(cfg.get("ddns_tracked_record_ids", [])),
             poll_interval=cfg.get("poll_interval_seconds", 300),
             configured=bool(cfg.get("cloudflare_api_token")
                             and cfg.get("cloudflare_zone_id")),
+            history=history, history_more=history_more,
+            history_family=family,
         )
 
     @app.route("/api/status")
@@ -365,6 +381,33 @@ def create_app():
     def api_check_now():
         poller.wake_event.set()
         return jsonify({"ok": True})
+
+    @app.route("/api/ip-history")
+    @login_required
+    def api_ip_history():
+        before = request.args.get("before", "")
+        before_id = int(before) if before.isdigit() else None
+        entries, has_more = ip_history.get_page(
+            before_id=before_id, limit=HISTORY_PAGE_SIZE,
+            family=_history_family())
+        return jsonify({"entries": entries, "has_more": has_more})
+
+    @app.route("/ip-history.csv")
+    @login_required
+    def ip_history_csv():
+        def fmt(ts):
+            return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) \
+                if ts else ""
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["family", "ip", "active_from", "active_until",
+                         "active_from_epoch", "active_until_epoch"])
+        for row in ip_history.get_all():
+            writer.writerow([row["family"], row["ip"], fmt(row["started_ts"]),
+                             fmt(row["ended_ts"]) or "active",
+                             row["started_ts"], row["ended_ts"] or ""])
+        return Response(buf.getvalue(), mimetype="text/csv", headers={
+            "Content-Disposition": "attachment; filename=ip-history.csv"})
 
     # --- DNS records ------------------------------------------------------------
 

@@ -3,6 +3,8 @@
 config.json
 state.json
 *.json.tmp
+history.db
+history.db.*
 
 # Python
 __pycache__/

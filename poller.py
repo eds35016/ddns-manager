@@ -1,6 +1,10 @@
 """DDNS poller: detect public IP changes, update tracked Cloudflare records,
 notify via Discord webhook and email.
 
+Cloudflare is optional: with no API token/zone/tracked records configured the
+service runs in notification-only mode — IP changes still trigger Discord and
+email alerts, they just don't update any DNS records.
+
 Runs as a daemon thread. Sleeps on wake_event.wait(timeout=interval) so the
 web GUI can wake it instantly ("Check Now", settings save) — this is what
 makes config changes take effect without a service restart. A separate
@@ -18,6 +22,7 @@ import requests
 
 import cloudflare_client as cf
 import config_store
+import ip_history
 
 log = logging.getLogger(__name__)
 
@@ -91,14 +96,20 @@ def send_email_notification(smtp_cfg, subject, body):
 
 
 def build_notification_message(old_ipv4, new_ipv4, old_ipv6, new_ipv6, results):
-    """One shared summary for both channels so they never disagree."""
-    lines = ["**Public IP address change detected**"
-             if any(r["ok"] for r in results) or results
-             else "**Public IP address change detected (no records updated)**"]
+    """One shared summary for both channels so they never disagree.
+
+    An empty results list means notify-only mode (no Cloudflare records
+    tracked) — the message then carries just the IP change itself."""
+    lines = ["**Public IP address change detected**"]
     if new_ipv4 and old_ipv4 != new_ipv4:
         lines.append(f"IPv4: {old_ipv4 or 'unknown'} → {new_ipv4}")
     if new_ipv6 and old_ipv6 != new_ipv6:
         lines.append(f"IPv6: {old_ipv6 or 'unknown'} → {new_ipv6}")
+    if not results:
+        lines.append("")
+        lines.append("No DNS records are set up for automatic updates "
+                     "(notification-only mode).")
+        return "\n".join(lines)
     lines.append("")
     ok = [r for r in results if r["ok"]]
     failed = [r for r in results if not r["ok"]]
@@ -257,6 +268,7 @@ def run_check_cycle(force_reconcile=False):
                    "service — the internet connection may be down.")
         return
     _clear_alert(config, "ip_lookup")
+    ip_history.record_check(ipv4, ipv6, now)
 
     old_ipv4, old_ipv6 = state.get("last_ipv4"), state.get("last_ipv6")
     ip_changed = (ipv4 and ipv4 != old_ipv4) or (ipv6 and ipv6 != old_ipv6)
@@ -272,10 +284,27 @@ def run_check_cycle(force_reconcile=False):
     tracked_ids = set(config.get("ddns_tracked_record_ids", []))
     if not tracked_ids or not config.get("cloudflare_api_token") \
             or not config.get("cloudflare_zone_id"):
-        config_store.update_state({
-            "last_check_ts": now, "last_ipv4": ipv4, "last_ipv6": ipv6,
-        })
-        _needs_reconcile = False
+        # Notify-only mode: no Cloudflare records to update, but IP changes
+        # are still announced. A first-ever sighting (no stored previous IP)
+        # sets the baseline silently rather than alerting "unknown → X".
+        changed = bool((old_ipv4 and ipv4 and ipv4 != old_ipv4)
+                       or (old_ipv6 and ipv6 and ipv6 != old_ipv6))
+        updates = {"last_check_ts": now, "last_ipv4": ipv4 or old_ipv4,
+                   "last_ipv6": ipv6 or old_ipv6}
+        if changed:
+            updates["last_change_ts"] = now
+        config_store.update_state(updates)
+        # _needs_reconcile stays True on purpose: if Cloudflare gets
+        # configured later, the next cycle then reconciles records right
+        # away instead of waiting for the next IP change.
+        if changed:
+            log.info("IP change detected (v4: %s → %s, v6: %s → %s); "
+                     "no Cloudflare records tracked — notifying only",
+                     old_ipv4, ipv4, old_ipv6, ipv6)
+            if config.get("notifications_enabled", True):
+                message = build_notification_message(
+                    old_ipv4, ipv4, old_ipv6, ipv6, [])
+                config_store.update_state({"notify": _notify(config, message)})
         return
 
     try:

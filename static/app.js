@@ -373,6 +373,82 @@
     setInterval(pollStatus, 10000);
   }
 
+  /* ---------------------------- IP history -------------------------------- */
+
+  var historyMoreBtn = document.getElementById("history-more-btn");
+
+  // Absolute local time, same shape as the server-rendered rows.
+  function absTime(epoch) {
+    var d = new Date(epoch * 1000);
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+      " " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }
+
+  function historyCell(className, text) {
+    var td = document.createElement("td");
+    if (className) td.className = className;
+    td.textContent = text;
+    return td;
+  }
+
+  function historyBadgeCell(className, text) {
+    var td = document.createElement("td");
+    var span = document.createElement("span");
+    span.className = className;
+    span.textContent = text;
+    td.appendChild(span);
+    return td;
+  }
+
+  function appendHistoryRows(entries) {
+    var body = document.getElementById("history-body");
+    if (!body) return;
+    entries.forEach(function (h) {
+      var tr = document.createElement("tr");
+      tr.appendChild(historyBadgeCell(
+        "badge badge-" + (h.family === "IPv4" ? "A" : "AAAA"), h.family));
+      tr.appendChild(historyCell("mono", h.ip));
+      tr.appendChild(historyCell("", absTime(h.started_ts)));
+      tr.appendChild(h.ended_ts
+        ? historyCell("", absTime(h.ended_ts))
+        : historyBadgeCell("chip chip-ok", "active"));
+      body.appendChild(tr);
+    });
+  }
+
+  if (historyMoreBtn) {
+    historyMoreBtn.addEventListener("click", function () {
+      var spin = historyMoreBtn.querySelector(".spinner");
+      historyMoreBtn.disabled = true;
+      if (spin) spin.hidden = false;
+
+      var before = historyMoreBtn.getAttribute("data-before") || "";
+      var family = historyMoreBtn.getAttribute("data-family") || "";
+      fetch("/api/ip-history?before=" + encodeURIComponent(before) +
+            (family ? "&family=" + encodeURIComponent(family) : ""),
+            { headers: { "Accept": "application/json" } })
+        .then(function (resp) {
+          if (resp.status === 401) { sessionExpired(); throw new Error("auth"); }
+          if (!resp.ok) throw new Error("failed");
+          return resp.json();
+        })
+        .then(function (data) {
+          appendHistoryRows(data.entries || []);
+          var last = (data.entries || [])[data.entries.length - 1];
+          if (last) historyMoreBtn.setAttribute("data-before", String(last.id));
+          historyMoreBtn.hidden = !data.has_more;
+        })
+        .catch(function (err) {
+          if (err.message !== "auth") toast("Couldn't load more history. Try again.", "error");
+        })
+        .finally(function () {
+          historyMoreBtn.disabled = false;
+          if (spin) spin.hidden = true;
+        });
+    });
+  }
+
   /* ----------------------------- check now -------------------------------- */
 
   var checkForm = document.getElementById("check-now-form");
