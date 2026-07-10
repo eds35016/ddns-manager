@@ -37,10 +37,10 @@
   <section class="card">
     <h2>Notifications</h2>
     <div class="field field-checkbox">
-      <label><input type="checkbox" name="notifications_enabled" {{ 'checked' if cfg.notifications_enabled }}> Send notifications on IP change</label>
+      <label><input type="checkbox" name="notifications_enabled" {{ 'checked' if cfg.notifications_enabled }}> Notify on IP change</label>
     </div>
     <div class="field field-checkbox">
-      <label><input type="checkbox" name="notify_on_errors" {{ 'checked' if cfg.notify_on_errors }}> Also alert on service problems</label>
+      <label><input type="checkbox" name="notify_on_errors" {{ 'checked' if cfg.notify_on_errors }}> Notify on service problems</label>
       <p class="field-hint">One alert when IP lookup or the Cloudflare API starts failing, and one when it recovers — never repeated spam.</p>
     </div>
 
