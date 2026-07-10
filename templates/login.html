@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Log in — DDNS Manager{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="login-brand">
+      <svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M2 12h20M12 2c3 3 4.5 6.5 4.5 10S15 19 12 22M12 2c-3 3-4.5 6.5-4.5 10S9 19 12 22"
+              fill="none" stroke="currentColor" stroke-width="1.6"/>
+      </svg>
+      <h1>DDNS Manager</h1>
+      <p class="muted">Sign in to manage your DNS</p>
+    </div>
+    <form method="post" action="{{ url_for('login', next=request.args.get('next')) }}" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-reveal">
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="reveal-toggle" data-reveal="password" aria-label="Show password">👁</button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

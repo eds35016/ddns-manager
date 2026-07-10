@@ -1,0 +1,29 @@
+# systemd unit for the DDNS Manager service.
+# Install: sudo cp ddns-manager.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now ddns-manager
+# See SETUP.md for the full deployment steps (user, venv, permissions).
+
+[Unit]
+Description=DDNS Manager — DDNS updater and Cloudflare DNS manager web GUI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ddns
+Group=ddns
+WorkingDirectory=/opt/ddns-manager
+ExecStart=/opt/ddns-manager/venv/bin/python /opt/ddns-manager/ddns_service.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/ddns-manager
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

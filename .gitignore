@@ -1,0 +1,20 @@
+# Runtime files — created on first run, hold secrets and per-install state.
+# Never commit these; see config.example.json for the shape.
+config.json
+state.json
+*.json.tmp
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

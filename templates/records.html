@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}DNS Records — DDNS Manager{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>DNS Records</h1>
+  {% if records is not none %}
+  <button type="button" class="btn btn-primary" id="add-record-btn" data-modal-open="record-modal">Add record</button>
+  {% endif %}
+</div>
+
+{% if unconfigured %}
+<div class="card empty-state empty-state-lg">
+  <h2>Connect Cloudflare to get started</h2>
+  <p class="muted">Add your API token and Zone ID and your zone's records will appear here.</p>
+  <a class="btn btn-primary" href="{{ url_for('settings') }}">Open Settings</a>
+</div>
+
+{% elif cf_error %}
+<div class="card error-panel">
+  <h2>Couldn't load records from Cloudflare</h2>
+  <p class="mono error-detail">{{ cf_error }}</p>
+  <div class="error-actions">
+    <a class="btn btn-primary" href="{{ url_for('records') }}">Retry</a>
+    <a class="btn btn-secondary" href="{{ url_for('settings') }}">Check settings</a>
+  </div>
+</div>
+
+{% elif not records %}
+<div class="card empty-state empty-state-lg">
+  <h2>No DNS records yet</h2>
+  <p class="muted">This zone has no records. Create your first one.</p>
+  <button type="button" class="btn btn-primary" data-modal-open="record-modal">Add record</button>
+</div>
+
+{% else %}
+<div class="card table-card">
+  <div class="table-toolbar">
+    <input type="search" id="record-filter" class="filter-input" placeholder="Filter by name or content…" aria-label="Filter records">
+    <select id="type-filter" aria-label="Filter by type">
+      <option value="">All types</option>
+      {% for t in records|map(attribute='type')|unique|sort %}
+      <option value="{{ t }}">{{ t }}</option>
+      {% endfor %}
+    </select>
+    <span class="muted" id="record-count">{{ records|length }} record{{ '' if records|length == 1 else 's' }}</span>
+  </div>
+
+  <div class="table-scroll">
+    <table class="records-table" id="records-table">
+      <thead>
+        <tr>
+          <th>Type</th><th>Name</th><th>Content</th><th>TTL</th>
+          <th class="th-center">Proxy</th><th class="th-center">DDNS</th>
+          <th class="th-actions"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr data-name="{{ r.name|lower }}" data-content="{{ (r.content or '')|lower }}" data-type="{{ r.type }}">
+          <td data-col="Type"><span class="badge badge-type badge-{{ r.type }}">{{ r.type }}</span></td>
+          <td data-col="Name" class="mono cell-name">{{ r.name }}</td>
+          <td data-col="Content" class="mono cell-content"><span class="truncate">{{ r.content }}</span></td>
+          <td data-col="TTL">{{ 'Auto' if r.ttl == 1 else r.ttl ~ 's' }}</td>
+          <td data-col="Proxy" class="td-center">
+            {% if r.type in ('A', 'AAAA', 'CNAME') %}
+            <span class="cloud {{ 'cloud-on' if r.proxied else 'cloud-off' }}"
+                  title="{{ 'Proxied through Cloudflare' if r.proxied else 'DNS only' }}">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6.5 18a4.5 4.5 0 1 1 .36-8.986A6 6 0 0 1 18.5 10.5 3.75 3.75 0 0 1 18 18z" fill="currentColor"/></svg>
+              <span class="visually-hidden">{{ 'Proxied' if r.proxied else 'DNS only' }}</span>
+            </span>
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td data-col="DDNS" class="td-center">
+            {% if r.type in ('A', 'AAAA') %}
+            <form method="post" action="{{ url_for('records_toggle_ddns', record_id=r.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="ddns-toggle {{ 'on' if r.id in tracked_ids }}" role="switch"
+                      aria-checked="{{ 'true' if r.id in tracked_ids else 'false' }}"
+                      title="{{ 'Auto-updating with your public IP' if r.id in tracked_ids else 'Click to auto-update with your public IP' }}">
+                <span class="ddns-knob"></span>
+              </button>
+            </form>
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td data-col="" class="td-actions">
+            <button type="button" class="icon-btn edit-btn" title="Edit record"
+                    data-record='{{ {"id": r.id, "type": r.type, "name": r.name,
+                                     "content": r.content, "ttl": r.ttl,
+                                     "proxied": r.proxied,
+                                     "priority": r.priority if r.priority is defined else none,
+                                     "data": r.data if r.data is defined else none}|tojson }}'>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M17 3l4 4L8 20l-5 1 1-5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+              <span class="visually-hidden">Edit {{ r.type }} {{ r.name }}</span>
+            </button>
+            <form method="post" action="{{ url_for('records_delete', record_id=r.id) }}" class="delete-form"
+                  data-record-desc="{{ r.type }} record {{ r.name }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="icon-btn icon-btn-danger" title="Delete record">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span class="visually-hidden">Delete {{ r.type }} {{ r.name }}</span>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="empty-state" id="no-matches" hidden>
+    <p>No records match your filter.</p>
+  </div>
+</div>
+{% endif %}
+
+{% if records is not none %}
+<!-- Add / edit record modal (a real form — works as a plain page section without JS) -->
+<div class="modal-backdrop" id="record-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="record-modal-title">
+    <div class="modal-head">
+      <h2 id="record-modal-title">Add record</h2>
+      <button type="button" class="icon-btn" data-modal-close aria-label="Close">✕</button>
+    </div>
+    <form method="post" action="{{ url_for('records_create') }}" id="record-form" class="stack"
+          data-create-action="{{ url_for('records_create') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field-row">
+        <div class="field">
+          <label for="rec-type">Type</label>
+          <select id="rec-type" name="type">
+            {% for t in ['A','AAAA','CNAME','TXT','MX','SRV','CAA'] %}
+            <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+            <option value="OTHER">Other…</option>
+          </select>
+        </div>
+        <div class="field field-grow">
+          <label for="rec-name">Name</label>
+          <input id="rec-name" name="name" type="text" placeholder="home.example.com" required>
+        </div>
+      </div>
+
+      <div class="field" data-types="A AAAA CNAME TXT MX">
+        <label for="rec-content" id="rec-content-label">Content</label>
+        <input id="rec-content" name="content" type="text" class="mono">
+        <p class="field-hint" id="rec-content-hint"></p>
+      </div>
+
+      <div class="field" data-types="MX">
+        <label for="rec-priority">Priority</label>
+        <input id="rec-priority" name="priority" type="number" min="0" max="65535" value="10">
+      </div>
+
+      <div class="field-row" data-types="SRV">
+        <div class="field"><label for="srv-priority">Priority</label>
+          <input id="srv-priority" name="srv_priority" type="number" min="0" max="65535" value="1"></div>
+        <div class="field"><label for="srv-weight">Weight</label>
+          <input id="srv-weight" name="srv_weight" type="number" min="0" max="65535" value="1"></div>
+        <div class="field"><label for="srv-port">Port</label>
+          <input id="srv-port" name="srv_port" type="number" min="1" max="65535"></div>
+      </div>
+      <div class="field" data-types="SRV">
+        <label for="srv-target">Target</label>
+        <input id="srv-target" name="srv_target" type="text" class="mono" placeholder="server.example.com">
+        <p class="field-hint">Name the record like <code>_minecraft._tcp.example.com</code></p>
+      </div>
+
+      <div class="field-row" data-types="CAA">
+        <div class="field"><label for="caa-flags">Flags</label>
+          <input id="caa-flags" name="caa_flags" type="number" min="0" max="255" value="0"></div>
+        <div class="field"><label for="caa-tag">Tag</label>
+          <select id="caa-tag" name="caa_tag">
+            <option value="issue">issue</option>
+            <option value="issuewild">issuewild</option>
+            <option value="iodef">iodef</option>
+          </select></div>
+        <div class="field field-grow"><label for="caa-value">Value</label>
+          <input id="caa-value" name="caa_value" type="text" class="mono" placeholder="letsencrypt.org"></div>
+      </div>
+
+      <div class="field" data-types="OTHER">
+        <label for="other-type">Record type</label>
+        <input id="other-type" name="other_type" type="text" placeholder="NS, PTR, LOC…">
+      </div>
+      <div class="field" data-types="OTHER">
+        <label for="other-json">Record payload (JSON)</label>
+        <textarea id="other-json" name="other_json" rows="4" class="mono"
+                  placeholder='{"content": "ns1.example.com"}'></textarea>
+        <p class="field-hint">Merged into the Cloudflare API payload — see Cloudflare's DNS record docs for the shape.</p>
+      </div>
+
+      <div class="field-row field-row-end">
+        <div class="field">
+          <label for="rec-ttl">TTL</label>
+          <select id="rec-ttl" name="ttl">
+            {% for t in ttl_choices %}
+            <option value="{{ t }}">{{ 'Auto' if t == 1 else (t // 3600 ~ ' h' if t >= 3600 else (t // 60 ~ ' min' if t >= 60 else t ~ ' s')) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field field-checkbox" data-types="A AAAA CNAME">
+          <label><input type="checkbox" id="rec-proxied" name="proxied"> Proxy through Cloudflare</label>
+          <p class="field-hint">Proxied records use Auto TTL and hide your IP, but only carry HTTP(S) traffic.</p>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="record-submit">
+          <span class="btn-label">Save record</span>
+          <span class="spinner" hidden aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-backdrop" id="delete-modal" hidden>
+  <div class="modal modal-sm" role="alertdialog" aria-modal="true" aria-labelledby="delete-modal-title">
+    <div class="modal-head">
+      <h2 id="delete-modal-title">Delete record?</h2>
+      <button type="button" class="icon-btn" data-modal-close aria-label="Close">✕</button>
+    </div>
+    <p>Delete <strong id="delete-desc"></strong>? This removes it from Cloudflare immediately and can't be undone.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Settings — DDNS Manager{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Settings</h1></div>
+
+<form method="post" action="{{ url_for('settings_save') }}" class="stack">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <section class="card">
+    <h2>Cloudflare</h2>
+    <div class="field">
+      <label for="cf-token">API token</label>
+      <div class="input-reveal">
+        <input id="cf-token" name="cloudflare_api_token" type="password" autocomplete="off"
+               placeholder="{{ '•••••••• saved — enter a new token to replace' if has_token else 'Paste your Cloudflare API token' }}">
+        <button type="button" class="reveal-toggle" data-reveal="cf-token" aria-label="Show token">👁</button>
+      </div>
+      <p class="field-hint">Create a token scoped to <strong>Zone → DNS → Edit</strong> for your zone only. Leave blank to keep the saved token.</p>
+    </div>
+    <div class="field">
+      <label for="cf-zone">Zone ID</label>
+      <input id="cf-zone" name="cloudflare_zone_id" type="text" class="mono"
+             value="{{ cfg.cloudflare_zone_id }}" placeholder="32-character hex ID from the zone's Overview page">
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>IP monitoring</h2>
+    <div class="field">
+      <label for="poll-interval">Check interval (seconds)</label>
+      <input id="poll-interval" name="poll_interval_seconds" type="number" min="60" max="86400"
+             value="{{ cfg.poll_interval_seconds }}">
+      <p class="field-hint">How often to look for a public IP change. 300 s (5 min) is a good default. Changes apply immediately — no restart needed.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Notifications</h2>
+    <div class="field field-checkbox">
+      <label><input type="checkbox" name="notifications_enabled" {{ 'checked' if cfg.notifications_enabled }}> Send notifications on IP change</label>
+    </div>
+    <div class="field field-checkbox">
+      <label><input type="checkbox" name="notify_on_errors" {{ 'checked' if cfg.notify_on_errors }}> Also alert on service problems</label>
+      <p class="field-hint">One alert when IP lookup or the Cloudflare API starts failing, and one when it recovers — never repeated spam.</p>
+    </div>
+
+    <h3>Discord webhooks</h3>
+    {% if webhooks_masked %}
+    <ul class="webhook-list">
+      {% for masked in webhooks_masked %}
+      <li>
+        <span class="mono">{{ masked }}</span>
+        <label class="webhook-remove"><input type="checkbox" name="remove_webhook" value="{{ loop.index0 }}"> remove</label>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No webhooks yet — every webhook you add gets each notification.</p>
+    {% endif %}
+    <div class="field">
+      <label for="new-webhooks">Add webhook(s) <span class="muted">(one per line)</span></label>
+      <textarea id="new-webhooks" name="new_webhooks" rows="2" class="mono"
+                placeholder="https://discord.com/api/webhooks/…"></textarea>
+    </div>
+
+    <h3>Email (SMTP)</h3>
+    <div class="field-row">
+      <div class="field field-grow">
+        <label for="smtp-host">SMTP host</label>
+        <input id="smtp-host" name="smtp_host" type="text" value="{{ cfg.smtp.host }}" placeholder="mail.yourprovider.com">
+      </div>
+      <div class="field">
+        <label for="smtp-port">Port</label>
+        <input id="smtp-port" name="smtp_port" type="number" min="1" max="65535" value="{{ cfg.smtp.port }}">
+      </div>
+      <div class="field">
+        <label for="smtp-security">Security</label>
+        <select id="smtp-security" name="smtp_security">
+          <option value="starttls" {{ 'selected' if cfg.smtp.security == 'starttls' }}>STARTTLS (587)</option>
+          <option value="ssl" {{ 'selected' if cfg.smtp.security == 'ssl' }}>SSL (465)</option>
+          <option value="none" {{ 'selected' if cfg.smtp.security == 'none' }}>None</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field field-grow">
+        <label for="smtp-user">Username</label>
+        <input id="smtp-user" name="smtp_username" type="text" value="{{ cfg.smtp.username }}" autocomplete="off">
+      </div>
+      <div class="field field-grow">
+        <label for="smtp-pass">Password</label>
+        <div class="input-reveal">
+          <input id="smtp-pass" name="smtp_password" type="password" autocomplete="off"
+                 placeholder="{{ '•••••••• saved — enter to replace' if has_smtp_password else 'SMTP password' }}">
+          <button type="button" class="reveal-toggle" data-reveal="smtp-pass" aria-label="Show password">👁</button>
+        </div>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field field-grow">
+        <label for="smtp-from">From address</label>
+        <input id="smtp-from" name="smtp_from_addr" type="email" value="{{ cfg.smtp.from_addr }}" placeholder="ddns@yourdomain.com">
+      </div>
+      <div class="field field-grow">
+        <label for="smtp-to">To address(es) <span class="muted">(comma-separated)</span></label>
+        <input id="smtp-to" name="smtp_to_addrs" type="text" value="{{ to_addrs_joined }}" placeholder="you@yourdomain.com, partner@example.com">
+      </div>
+    </div>
+  </section>
+
+  <div class="save-bar">
+    <button type="submit" class="btn btn-primary">Save settings</button>
+  </div>
+</form>
+
+<section class="card">
+  <h2>Connection test</h2>
+  <p class="muted">Verifies your API token and counts the records in your zone.</p>
+  <form method="post" action="{{ url_for('settings_test_connection') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-secondary">Test Cloudflare connection</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Change admin password</h2>
+  <form method="post" action="{{ url_for('settings_password') }}" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="field">
+      <label for="cur-pass">Current password</label>
+      <input id="cur-pass" name="current_password" type="password" autocomplete="current-password" required>
+    </div>
+    <div class="field-row">
+      <div class="field field-grow">
+        <label for="new-pass">New password <span class="muted">(min 10 characters)</span></label>
+        <input id="new-pass" name="new_password" type="password" autocomplete="new-password" minlength="10" required>
+      </div>
+      <div class="field field-grow">
+        <label for="confirm-pass">Confirm new password</label>
+        <input id="confirm-pass" name="confirm_password" type="password" autocomplete="new-password" minlength="10" required>
+      </div>
+    </div>
+    <div><button type="submit" class="btn btn-secondary">Change password</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Server</h2>
+  <p class="muted">The GUI is listening on <span class="mono">{{ cfg.bind_host }}:{{ cfg.bind_port }}</span>.
+  Changing the bind address or port requires editing <span class="mono">config.json</span> and restarting the service —
+  everything else on this page applies live. Never port-forward this GUI to the internet.</p>
+</section>
+{% endblock %}

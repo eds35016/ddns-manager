@@ -1,0 +1,27 @@
+{
+  "_comment": "Example shape of config.json. The real file is created automatically on first run with generated credentials — you normally never edit it by hand; use the web GUI. If you do edit it, stop the service first (the GUI overwrites hand edits).",
+  "admin_username": "admin",
+  "admin_password_hash": "(generated on first run — a hash, never the plaintext password)",
+  "session_secret": "(generated on first run)",
+  "bind_host": "0.0.0.0",
+  "bind_port": 8080,
+  "poll_interval_seconds": 300,
+  "cloudflare_api_token": "(set via the web GUI — token scoped to Zone / DNS / Edit)",
+  "cloudflare_zone_id": "(32-char hex ID from the Cloudflare zone Overview page)",
+  "ddns_tracked_record_ids": ["(Cloudflare record IDs toggled on in the DNS Records page)"],
+  "discord_webhook_urls": [
+    "https://discord.com/api/webhooks/...",
+    "https://discord.com/api/webhooks/... (every webhook gets each notification)"
+  ],
+  "smtp": {
+    "host": "mail.yourprovider.com",
+    "port": 587,
+    "security": "starttls",
+    "username": "ddns@yourdomain.com",
+    "password": "(set via the web GUI)",
+    "from_addr": "ddns@yourdomain.com",
+    "to_addrs": ["you@yourdomain.com", "partner@example.com"]
+  },
+  "notifications_enabled": true,
+  "notify_on_errors": true
+}

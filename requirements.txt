@@ -1,0 +1,4 @@
+flask>=3.0
+flask-wtf>=1.2
+requests>=2.31
+waitress>=3.0

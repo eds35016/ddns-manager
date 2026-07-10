@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — DDNS Manager{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Dashboard</h1>
+  <form method="post" action="{{ url_for('api_check_now') }}" id="check-now-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-primary" id="check-now-btn">
+      <span class="btn-label">Check now</span>
+      <span class="spinner" hidden aria-hidden="true"></span>
+    </button>
+  </form>
+</div>
+
+{% if not configured %}
+<div class="banner banner-warn">
+  Cloudflare isn't connected yet — add your API token and Zone ID in
+  <a href="{{ url_for('settings') }}">Settings</a> to start managing DNS.
+</div>
+{% endif %}
+
+<div id="cf-error-banner" class="banner banner-error" {% if state.cloudflare_auth_ok and not state.cloudflare_error %}hidden{% endif %}>
+  <strong>Cloudflare problem:</strong>
+  <span id="cf-error-text">{{ state.cloudflare_error or '' }}</span>
+  — fix your token in <a href="{{ url_for('settings') }}">Settings</a>; the service will recover automatically.
+</div>
+
+<div id="ip-error-banner" class="banner banner-error" {% if not state.alerts.get('ip_lookup') %}hidden{% endif %}>
+  <strong>IP lookup problem:</strong>
+  <span id="ip-error-text">{{ state.alerts.get('ip_lookup') or '' }}</span>
+</div>
+
+<div class="stat-grid">
+  <div class="card stat">
+    <div class="stat-label">Public IPv4</div>
+    <div class="stat-value mono" id="stat-ipv4">{{ state.last_ipv4 or '—' }}</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Public IPv6</div>
+    <div class="stat-value mono stat-value-sm" id="stat-ipv6">{{ state.last_ipv6 or 'not detected' }}</div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Last check</div>
+    <div class="stat-value" id="stat-last-check" data-ts="{{ state.last_check_ts or '' }}">{{ state.last_check_ts|ts }}</div>
+    <div class="stat-sub">every <span id="stat-interval">{{ poll_interval // 60 }}</span> min
+      <span class="status-dot" id="status-dot" data-state="{{ 'err' if state.cloudflare_error else 'ok' }}"></span>
+    </div>
+  </div>
+  <div class="card stat">
+    <div class="stat-label">Last IP change</div>
+    <div class="stat-value" id="stat-last-change" data-ts="{{ state.last_change_ts or '' }}">{{ state.last_change_ts|ts }}</div>
+    <div class="stat-sub">{{ tracked_count }} record{{ '' if tracked_count == 1 else 's' }} auto-updated</div>
+  </div>
+</div>
+
+<section class="card">
+  <h2>Tracked records</h2>
+  {% if state.records %}
+  <ul class="record-status-list" id="record-status-list">
+    {% for rid, rec in state.records.items() %}
+    <li>
+      <span class="badge badge-type badge-{{ rec.type }}">{{ rec.type }}</span>
+      <span class="mono">{{ rec.name }}</span>
+      <span class="chip chip-{{ 'ok' if rec.status == 'ok' else 'err' }}">{{ rec.message }}</span>
+      <span class="muted rel-ts" data-ts="{{ rec.ts or '' }}">{{ rec.ts|ts }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state">
+    <p>No records are being auto-updated yet.</p>
+    <a class="btn btn-secondary" href="{{ url_for('records') }}">Choose records to track</a>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Notifications</h2>
+  <div class="notify-status">
+    <div>
+      <span class="notify-label">Discord</span>
+      <span class="chip" id="notify-discord" data-status="{{ state.notify.discord or '' }}">
+        {{ state.notify.discord or 'nothing sent yet' }}</span>
+    </div>
+    <div>
+      <span class="notify-label">Email</span>
+      <span class="chip" id="notify-email" data-status="{{ state.notify.email or '' }}">
+        {{ state.notify.email or 'nothing sent yet' }}</span>
+    </div>
+  </div>
+  <p class="muted">Both channels are notified whenever your IP changes, including whether each DNS update succeeded.</p>
+</section>
+{% endblock %}

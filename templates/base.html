@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}DDNS Manager{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% if session.get('authenticated') %}
+<header class="topnav">
+  <div class="topnav-inner">
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <svg class="brand-mark" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M2 12h20M12 2c3 3 4.5 6.5 4.5 10S15 19 12 22M12 2c-3 3-4.5 6.5-4.5 10S9 19 12 22"
+              fill="none" stroke="currentColor" stroke-width="1.6"/>
+      </svg>
+      <span>DDNS&nbsp;Manager</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
+      <a href="{{ url_for('records') }}" class="{{ 'active' if request.endpoint == 'records' }}">DNS Records</a>
+      <a href="{{ url_for('settings') }}" class="{{ 'active' if request.endpoint and request.endpoint.startswith('settings') }}">Settings</a>
+    </nav>
+    <form method="post" action="{{ url_for('logout') }}" class="logout-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-ghost btn-sm">Log out</button>
+    </form>
+  </div>
+</header>
+{% endif %}
+
+<div id="session-expired" class="banner banner-warn" hidden>
+  Your session has expired. <a href="{{ url_for('login') }}">Log in again</a>
+</div>
+
+<main class="container">
+  {% block content %}{% endblock %}
+</main>
+
+<div id="toasts" class="toast-region" aria-live="polite">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="toast toast-{{ category }}" role="status">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
