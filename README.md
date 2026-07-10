@@ -29,9 +29,11 @@ _Dashboard, DNS record manager, and settings pages — run it locally (see below
 
 ## Quick start (local / development)
 
+This just runs the service in your terminal for a quick look at the GUI — it's **not** the deployment method. If you're setting this up for real on a Pi or always-on server, skip straight to [SETUP.md](SETUP.md).
+
 ```bash
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/eds35016/ddns-manager.git
+cd ddns-manager
 python3 -m venv venv
 source venv/bin/activate   # venv\Scripts\activate on Windows
 pip install -r requirements.txt
