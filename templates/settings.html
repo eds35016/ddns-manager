@@ -13,7 +13,7 @@
     <div class="field">
       <label for="cf-token">API token</label>
       <div class="input-reveal">
-        <input id="cf-token" name="cloudflare_api_token" type="password" autocomplete="off"
+        <input id="cf-token" name="cloudflare_api_token" type="password" autocomplete="new-password"
                placeholder="{{ '•••••••• saved — enter a new token to replace' if has_token else 'Paste your Cloudflare API token' }}">
         <button type="button" class="reveal-toggle" data-reveal="cf-token" aria-label="Show token">👁</button>
       </div>
@@ -100,7 +100,7 @@
       <div class="field field-grow">
         <label for="smtp-pass">Password</label>
         <div class="input-reveal">
-          <input id="smtp-pass" name="smtp_password" type="password" autocomplete="off"
+          <input id="smtp-pass" name="smtp_password" type="password" autocomplete="new-password"
                  placeholder="{{ '•••••••• saved — enter to replace' if has_smtp_password else 'SMTP password' }}">
           <button type="button" class="reveal-toggle" data-reveal="smtp-pass" aria-label="Show password">👁</button>
         </div>
