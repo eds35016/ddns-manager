@@ -405,6 +405,8 @@ main .banner { margin: 0 0 var(--sp-5); }
   display: grid; place-items: center; padding: var(--sp-4);
   overflow-y: auto;
 }
+/* display: grid above would otherwise override the UA's [hidden] rule */
+.modal-backdrop[hidden] { display: none; }
 .modal {
   background: var(--surface); border-radius: var(--radius);
   box-shadow: var(--shadow-lg); border: 1px solid var(--border);
