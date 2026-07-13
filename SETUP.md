@@ -51,7 +51,7 @@ You normally never edit this file — everything except the bind address/port is
 | `ddns_tracked_record_ids`                  | Record IDs auto-updated with your IP                                                                       | `[]`                 |
 | `discord_webhook_urls`                     | List of `{url, ping_user_ids}` — each webhook gets every notification, optionally @-mentioning its own list of Discord user IDs | `[]`                 |
 | `smtp.*`                                   | Email: host, port, security (`starttls`/`ssl`/`none`), username, password, from, `to_addrs` (list) | port 587 starttls      |
-| `notifications_enabled`                    | Master switch for both channels                                                                            | `true`               |
+| `notify_ipv4_changes` / `notify_ipv6_changes` | Alert on IPv4 / IPv6 changes (both channels). DNS records are still updated when off — these only silence the alerts. An older `notifications_enabled` key migrates into both automatically | `true` / `true`      |
 | `notify_on_errors`                         | Alert once when IP lookup / Cloudflare access starts failing, and once on recovery                         | `true`               |
 
 ---

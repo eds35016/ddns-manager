@@ -22,6 +22,7 @@
     "from_addr": "ddns@yourdomain.com",
     "to_addrs": ["you@yourdomain.com", "partner@example.com"]
   },
-  "notifications_enabled": true,
+  "notify_ipv4_changes": true,
+  "notify_ipv6_changes": true,
   "notify_on_errors": true
 }

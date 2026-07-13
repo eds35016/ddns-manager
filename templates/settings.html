@@ -39,7 +39,11 @@
   <section class="card">
     <h2>Notifications</h2>
     <div class="field field-checkbox">
-      <label><input type="checkbox" name="notifications_enabled" {{ 'checked' if cfg.notifications_enabled }}> Notify on IP change</label>
+      <label><input type="checkbox" name="notify_ipv4_changes" {{ 'checked' if cfg.notify_ipv4_changes }}> Notify on IPv4 change</label>
+    </div>
+    <div class="field field-checkbox">
+      <label><input type="checkbox" name="notify_ipv6_changes" {{ 'checked' if cfg.notify_ipv6_changes }}> Notify on IPv6 change</label>
+      <p class="field-hint">Handy when one address changes constantly (some ISPs rotate the IPv6 prefix daily) and you only care about the other. DNS records are always kept updated either way — these switches only control alerts. If both change at once and at least one switch is on, a single combined alert describes both changes.</p>
     </div>
     <div class="field field-checkbox">
       <label><input type="checkbox" name="notify_on_errors" {{ 'checked' if cfg.notify_on_errors }}> Notify on service problems</label>

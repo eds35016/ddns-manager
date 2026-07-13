@@ -291,8 +291,9 @@ def run_check_cycle(force_reconcile=False):
         # Notify-only mode: no Cloudflare records to update, but IP changes
         # are still announced. A first-ever sighting (no stored previous IP)
         # sets the baseline silently rather than alerting "unknown → X".
-        changed = bool((old_ipv4 and ipv4 and ipv4 != old_ipv4)
-                       or (old_ipv6 and ipv6 and ipv6 != old_ipv6))
+        v4_changed = bool(old_ipv4 and ipv4 and ipv4 != old_ipv4)
+        v6_changed = bool(old_ipv6 and ipv6 and ipv6 != old_ipv6)
+        changed = v4_changed or v6_changed
         updates = {"last_check_ts": now, "last_ipv4": ipv4 or old_ipv4,
                    "last_ipv6": ipv6 or old_ipv6}
         if changed:
@@ -305,7 +306,8 @@ def run_check_cycle(force_reconcile=False):
             log.info("IP change detected (v4: %s → %s, v6: %s → %s); "
                      "no Cloudflare records tracked — notifying only",
                      old_ipv4, ipv4, old_ipv6, ipv6)
-            if config.get("notifications_enabled", True):
+            if (v4_changed and config.get("notify_ipv4_changes", True)) \
+                    or (v6_changed and config.get("notify_ipv6_changes", True)):
                 message = build_notification_message(
                     old_ipv4, ipv4, old_ipv6, ipv6, [])
                 config_store.update_state({"notify": _notify(config, message)})
@@ -363,7 +365,13 @@ def run_check_cycle(force_reconcile=False):
         "last_change_ts": now,
     })
 
-    if results and config.get("notifications_enabled", True):
+    # Per-family notification gate: an update touching only A records is an
+    # IPv4 event, only AAAA an IPv6 event. Entries without a record type
+    # (e.g. "remaining records skipped" after a Cloudflare failure) always
+    # notify. If both families are involved, one combined message covers both.
+    notify_family = {"A": config.get("notify_ipv4_changes", True),
+                     "AAAA": config.get("notify_ipv6_changes", True)}
+    if results and any(notify_family.get(r["type"], True) for r in results):
         message = build_notification_message(old_ipv4, ipv4, old_ipv6, ipv6, results)
         notify_status = _notify(config, message)
         config_store.update_state({"notify": notify_status})

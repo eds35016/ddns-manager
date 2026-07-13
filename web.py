@@ -627,7 +627,8 @@ def create_app():
         smtp_changes["to_addrs"] = to_addrs
 
         changes["smtp"] = smtp_changes
-        changes["notifications_enabled"] = form.get("notifications_enabled") == "on"
+        changes["notify_ipv4_changes"] = form.get("notify_ipv4_changes") == "on"
+        changes["notify_ipv6_changes"] = form.get("notify_ipv6_changes") == "on"
         changes["notify_on_errors"] = form.get("notify_on_errors") == "on"
 
         if errors:

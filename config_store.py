@@ -50,7 +50,11 @@ DEFAULT_CONFIG = {
         "from_addr": "",
         "to_addrs": [],
     },
-    "notifications_enabled": True,
+    # Which address-family changes trigger a notification. Disabling one
+    # never stops DNS record updates — it only silences the alerts (useful
+    # when an ISP rotates the IPv6 prefix constantly).
+    "notify_ipv4_changes": True,
+    "notify_ipv6_changes": True,
     # Also alert (once per incident, plus a recovery notice) when the service
     # itself has a problem: IP lookup failing, Cloudflare unreachable, etc.
     "notify_on_errors": True,
@@ -105,6 +109,18 @@ def _merge_defaults(cfg, defaults):
     return cfg
 
 
+def _migrate_notify_flags(cfg):
+    """Older configs had a single notifications_enabled switch for IP-change
+    alerts; split it into per-family flags, preserving the user's choice.
+    Must run before _merge_defaults, which would otherwise fill the new keys
+    with True and lose a saved "off" setting."""
+    old = cfg.pop("notifications_enabled", None)
+    if old is not None:
+        cfg.setdefault("notify_ipv4_changes", bool(old))
+        cfg.setdefault("notify_ipv6_changes", bool(old))
+    return cfg
+
+
 def _migrate_webhooks(cfg):
     """Older configs stored discord_webhook_urls as a plain list of URL
     strings. Upgrade each entry to {"url", "ping_user_ids"} in place so the
@@ -129,7 +145,8 @@ def load_config():
     with _lock:
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                _config = _merge_defaults(json.load(f), DEFAULT_CONFIG)
+                _config = _merge_defaults(
+                    _migrate_notify_flags(json.load(f)), DEFAULT_CONFIG)
         else:
             _config = copy.deepcopy(DEFAULT_CONFIG)
         _migrate_webhooks(_config)
