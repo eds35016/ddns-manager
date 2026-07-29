@@ -41,6 +41,17 @@ DISCORD_MESSAGE_LIMIT = 2000
 _needs_reconcile = True
 
 
+def request_reconcile():
+    """Ask the poller for a full reconcile on its next cycle, then wake it.
+
+    Used by the web GUI whenever the tracked-record set or Cloudflare
+    settings change, and by "Check now" — the public IP usually hasn't
+    changed at those moments, so a plain wake would skip the records."""
+    global _needs_reconcile
+    _needs_reconcile = True
+    wake_event.set()
+
+
 def _fetch_ip(sources, family_check):
     """Try each source in order; return a validated IP string or None."""
     for url in sources:

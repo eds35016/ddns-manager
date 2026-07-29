@@ -379,7 +379,7 @@ def create_app():
     @app.route("/api/check-now", methods=["POST"])
     @login_required
     def api_check_now():
-        poller.wake_event.set()
+        poller.request_reconcile()
         return jsonify({"ok": True})
 
     @app.route("/api/ip-history")
@@ -501,7 +501,7 @@ def create_app():
             tracked.append(record_id)
             flash("Record will now be kept updated with your public IP.", "success")
         config_store.update_config({"ddns_tracked_record_ids": tracked})
-        poller.wake_event.set()
+        poller.request_reconcile()
         return redirect(url_for("records"))
 
     # --- settings ---------------------------------------------------------------
@@ -636,7 +636,7 @@ def create_app():
                 flash(e, "error")
         else:
             config_store.update_config(changes)
-            poller.wake_event.set()
+            poller.request_reconcile()
             flash("Settings saved — changes take effect immediately.", "success")
         return redirect(url_for("settings"))
 
