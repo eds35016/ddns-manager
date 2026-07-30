@@ -4,7 +4,7 @@ A single service, meant to run on any always-on Linux box on your home network (
 
 1. **Monitors your public IP** (IPv4 and IPv6) on a schedule you choose, keeping a full history of past addresses and when each was active (SQLite, browsable on the dashboard, exportable as CSV).
 2. **Updates Cloudflare DNS records** you've flagged for auto-update whenever the IP changes.
-3. **Notifies you via Discord and email** (multiple webhooks / recipients supported), including whether each DNS update succeeded — plus a one-time alert if the service itself runs into trouble (IP lookup failing, Cloudflare unreachable) and a notice when it recovers.
+3. **Notifies you via Discord and email** (multiple webhooks / recipients supported), including whether each DNS update succeeded — plus a one-time alert if the service itself runs into trouble (IP lookup failing, Cloudflare unreachable) and a notice when it recovers. Each notification type can be sent to Discord, email, both, or neither. An optional **scheduled summary** (daily / weekly / bi-weekly / monthly at a time you pick) recaps the period's IP changes and doubles as a proof-of-life signal that the service is still running.
 4. **Hosts a local web GUI** on your LAN for managing *all* your Cloudflare DNS records (create/edit/delete any type, proxied or not) and for changing every setting live — no service restart needed.
 
 Cloudflare is **optional**: leave the token/Zone ID blank and the service runs in **notification-only mode** — IP changes are still detected and announced via Discord/email, they just don't update any DNS records. You can add Cloudflare later at any time from Settings.
@@ -51,8 +51,9 @@ You normally never edit this file — everything except the bind address/port is
 | `ddns_tracked_record_ids`                  | Record IDs auto-updated with your IP                                                                       | `[]`                 |
 | `discord_webhook_urls`                     | List of `{url, ping_user_ids}` — each webhook gets every notification, optionally @-mentioning its own list of Discord user IDs | `[]`                 |
 | `smtp.*`                                   | Email: host, port, security (`starttls`/`ssl`/`none`), username, password, from, `to_addrs` (list) | port 587 starttls      |
-| `notify_ipv4_changes` / `notify_ipv6_changes` | Alert on IPv4 / IPv6 changes (both channels). DNS records are still updated when off — these only silence the alerts. An older `notifications_enabled` key migrates into both automatically | `true` / `true`      |
-| `notify_on_errors`                         | Alert once when IP lookup / Cloudflare access starts failing, and once on recovery                         | `true`               |
+| `notify_ipv4_changes` / `notify_ipv6_changes` | Alert on IPv4 / IPv6 changes, per channel: `{"discord": bool, "email": bool}`. DNS records are still updated when off — these only silence the alerts. Older single-boolean values (and the even older `notifications_enabled` key) migrate automatically | both `true`      |
+| `notify_on_errors`                         | Alert once when IP lookup / Cloudflare access starts failing, and once on recovery — same per-channel shape | both `true`               |
+| `summary.*`                                | Scheduled summary: `enabled`, `frequency` (`daily`/`weekly`/`biweekly`/`monthly`), `day_of_week` (0=Mon…6=Sun), `day_of_month` (1–28), `time` (`HH:MM`, server local time), `catch_up` (send a summary missed while the service was off right after startup), plus `discord`/`email` channel switches | disabled, weekly Sun 01:00, catch-up on |
 
 ---
 

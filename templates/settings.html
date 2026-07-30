@@ -38,17 +38,77 @@
 
   <section class="card">
     <h2>Notifications</h2>
-    <div class="field field-checkbox">
-      <label><input type="checkbox" name="notify_ipv4_changes" {{ 'checked' if cfg.notify_ipv4_changes }}> Notify on IPv4 change</label>
+
+    <h3>Notification types</h3>
+    <p class="field-hint">Choose which channel(s) deliver each type of notification. A channel only sends if it's also set up below (webhooks / SMTP).</p>
+    <div class="notify-grid">
+      <span></span>
+      <span class="notify-grid-head">Discord</span>
+      <span class="notify-grid-head">Email</span>
+
+      <span class="notify-type">IPv4 change</span>
+      <label class="notify-check"><input type="checkbox" name="notify_ipv4_discord" {{ 'checked' if cfg.notify_ipv4_changes.discord }}><span class="visually-hidden">Discord on IPv4 change</span></label>
+      <label class="notify-check"><input type="checkbox" name="notify_ipv4_email" {{ 'checked' if cfg.notify_ipv4_changes.email }}><span class="visually-hidden">Email on IPv4 change</span></label>
+
+      <span class="notify-type">IPv6 change</span>
+      <label class="notify-check"><input type="checkbox" name="notify_ipv6_discord" {{ 'checked' if cfg.notify_ipv6_changes.discord }}><span class="visually-hidden">Discord on IPv6 change</span></label>
+      <label class="notify-check"><input type="checkbox" name="notify_ipv6_email" {{ 'checked' if cfg.notify_ipv6_changes.email }}><span class="visually-hidden">Email on IPv6 change</span></label>
+
+      <span class="notify-type">Service problems</span>
+      <label class="notify-check"><input type="checkbox" name="notify_errors_discord" {{ 'checked' if cfg.notify_on_errors.discord }}><span class="visually-hidden">Discord on service problems</span></label>
+      <label class="notify-check"><input type="checkbox" name="notify_errors_email" {{ 'checked' if cfg.notify_on_errors.email }}><span class="visually-hidden">Email on service problems</span></label>
     </div>
-    <div class="field field-checkbox">
-      <label><input type="checkbox" name="notify_ipv6_changes" {{ 'checked' if cfg.notify_ipv6_changes }}> Notify on IPv6 change</label>
-      <p class="field-hint">Handy when one address changes constantly (some ISPs rotate the IPv6 prefix daily) and you only care about the other. DNS records are always kept updated either way — these switches only control alerts. If both change at once and at least one switch is on, a single combined alert describes both changes.</p>
+    <p class="field-hint">Turning off an IP-change alert is handy when one address changes constantly (some ISPs rotate the IPv6 prefix daily) — DNS records are always kept updated either way; these switches only control the messages. If both families change at once, one combined alert goes to every channel enabled for either. Service problems alert once when IP lookup or the Cloudflare API starts failing and once on recovery — never repeated spam.</p>
+
+    <h3>Scheduled summary</h3>
+    <p class="field-hint">A periodic recap of every IP change in the period — and a proof-of-life signal that the service is still up even when nothing changed. Bi-weekly means every other week on the chosen day; times are the server's local time.</p>
+    <div class="summary-options">
+      <div class="field field-checkbox">
+        <label><input type="checkbox" name="summary_enabled" {{ 'checked' if cfg.summary.enabled }}> Send scheduled summaries</label>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="summary-frequency">Frequency</label>
+          <select id="summary-frequency" name="summary_frequency">
+            <option value="daily" {{ 'selected' if cfg.summary.frequency == 'daily' }}>Daily</option>
+            <option value="weekly" {{ 'selected' if cfg.summary.frequency == 'weekly' }}>Weekly</option>
+            <option value="biweekly" {{ 'selected' if cfg.summary.frequency == 'biweekly' }}>Bi-weekly</option>
+            <option value="monthly" {{ 'selected' if cfg.summary.frequency == 'monthly' }}>Monthly</option>
+          </select>
+        </div>
+        <div class="field" data-summary-freq="weekly biweekly">
+          <label for="summary-dow">Day</label>
+          <select id="summary-dow" name="summary_day_of_week">
+            {% for name in day_names %}
+            <option value="{{ loop.index0 }}" {{ 'selected' if cfg.summary.day_of_week == loop.index0 }}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field" data-summary-freq="monthly">
+          <label for="summary-dom">Day of month</label>
+          <input id="summary-dom" name="summary_day_of_month" type="number" min="1" max="28" value="{{ cfg.summary.day_of_month }}">
+        </div>
+        <div class="field">
+          <label for="summary-time">Time</label>
+          <input id="summary-time" name="summary_time" type="time" value="{{ cfg.summary.time }}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field field-checkbox">
+          <label><input type="checkbox" name="summary_discord" {{ 'checked' if cfg.summary.discord }}> Send via Discord</label>
+        </div>
+        <div class="field field-checkbox">
+          <label><input type="checkbox" name="summary_email" {{ 'checked' if cfg.summary.email }}> Send via email</label>
+        </div>
+      </div>
+      <div class="field field-checkbox">
+        <label><input type="checkbox" name="summary_catch_up" {{ 'checked' if cfg.summary.catch_up }}> Send a missed summary after a restart</label>
+        <p class="field-hint">If a summary came due while the service was off, send it right after startup. Turn this off to skip it — the next scheduled summary still covers the whole gap.</p>
+      </div>
     </div>
-    <div class="field field-checkbox">
-      <label><input type="checkbox" name="notify_on_errors" {{ 'checked' if cfg.notify_on_errors }}> Notify on service problems</label>
-      <p class="field-hint">One alert when IP lookup or the Cloudflare API starts failing, and one when it recovers — never repeated spam.</p>
-    </div>
+    {% if summary_next_ts %}
+    <p class="field-hint">Next summary will be sent <strong>{{ summary_next_ts|ts }}</strong>.</p>
+    {% endif %}
 
     <h3>Discord webhooks</h3>
     {% if webhooks %}

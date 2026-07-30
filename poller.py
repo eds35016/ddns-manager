@@ -23,6 +23,7 @@ import requests
 import cloudflare_client as cf
 import config_store
 import ip_history
+import summary
 
 log = logging.getLogger(__name__)
 
@@ -146,14 +147,43 @@ def _redact_webhooks(text, webhooks):
     return text
 
 
-def _notify(config, message, subject="DDNS: public IP change detected"):
+def _channels_for(config, key):
+    """Per-channel enable flags for one notification type, as
+    {"discord": bool, "email": bool}. Tolerates the pre-migration single
+    boolean shape in case config.json was hand-edited."""
+    value = config.get(key, True)
+    if isinstance(value, dict):
+        return {"discord": bool(value.get("discord", True)),
+                "email": bool(value.get("email", True))}
+    return {"discord": bool(value), "email": bool(value)}
+
+
+def _union_channels(*channel_dicts):
+    """OR together per-channel flag dicts (None entries are skipped) — used
+    when one combined message covers several notification types."""
+    union = {"discord": False, "email": False}
+    for channels in channel_dicts:
+        if channels:
+            union = {c: union[c] or channels.get(c, False) for c in union}
+    return union
+
+
+def _notify(config, message, subject="DDNS: public IP change detected",
+            channels=None):
     """Send to every Discord webhook and all email recipients independently;
-    return per-channel status. One channel failing never blocks the other."""
-    status = {"discord": None, "email": None}
+    return per-channel status. One channel failing never blocks the other.
+
+    channels ({"discord": bool, "email": bool}, default both) lets each
+    notification type silence a channel. A silenced or unconfigured channel
+    is left out of the returned status, so the dashboard keeps showing the
+    result of the last channel actually attempted."""
+    if channels is None:
+        channels = {"discord": True, "email": True}
+    status = {}
     plain = message.replace("**", "")
 
     webhooks = config.get("discord_webhook_urls") or []
-    if webhooks:
+    if webhooks and channels.get("discord"):
         sent = 0
         last_error = None
         webhook_urls = [w["url"] for w in webhooks]
@@ -173,7 +203,7 @@ def _notify(config, message, subject="DDNS: public IP change detected"):
 
     smtp_cfg = config.get("smtp", {})
     to_addrs = smtp_cfg.get("to_addrs") or []
-    if smtp_cfg.get("host") and to_addrs:
+    if smtp_cfg.get("host") and to_addrs and channels.get("email"):
         try:
             send_email_notification(smtp_cfg, subject, plain)
             status["email"] = "sent" if len(to_addrs) == 1 \
@@ -197,7 +227,8 @@ def _set_alert(config, kind, message):
     state = config_store.get_state()
     already_active = state.get("alerts", {}).get(kind)
     config_store.update_state({"alerts": {kind: message}})
-    if already_active or not config.get("notify_on_errors", True):
+    channels = _channels_for(config, "notify_on_errors")
+    if already_active or not any(channels.values()):
         return
     log.warning("Service problem (%s): %s", kind, message)
     notify_status = _notify(
@@ -207,6 +238,7 @@ def _set_alert(config, kind, message):
         f"The service keeps retrying every cycle; you'll get a recovery "
         f"notice when it clears.",
         subject="DDNS: service problem detected",
+        channels=channels,
     )
     config_store.update_state({"notify": notify_status})
 
@@ -218,13 +250,15 @@ def _clear_alert(config, kind):
     if not was_active:
         return
     config_store.update_state({"alerts": {kind: None}})
-    if not config.get("notify_on_errors", True):
+    channels = _channels_for(config, "notify_on_errors")
+    if not any(channels.values()):
         return
     log.info("Service problem resolved (%s)", kind)
     notify_status = _notify(
         config,
         f"✅ **DDNS service recovered** — {ALERT_DESCRIPTIONS[kind]} is working again.",
         subject="DDNS: service recovered",
+        channels=channels,
     )
     config_store.update_state({"notify": notify_status})
 
@@ -317,11 +351,14 @@ def run_check_cycle(force_reconcile=False):
             log.info("IP change detected (v4: %s → %s, v6: %s → %s); "
                      "no Cloudflare records tracked — notifying only",
                      old_ipv4, ipv4, old_ipv6, ipv6)
-            if (v4_changed and config.get("notify_ipv4_changes", True)) \
-                    or (v6_changed and config.get("notify_ipv6_changes", True)):
+            channels = _union_channels(
+                _channels_for(config, "notify_ipv4_changes") if v4_changed else None,
+                _channels_for(config, "notify_ipv6_changes") if v6_changed else None)
+            if any(channels.values()):
                 message = build_notification_message(
                     old_ipv4, ipv4, old_ipv6, ipv6, [])
-                config_store.update_state({"notify": _notify(config, message)})
+                config_store.update_state(
+                    {"notify": _notify(config, message, channels=channels)})
         return
 
     try:
@@ -379,13 +416,88 @@ def run_check_cycle(force_reconcile=False):
     # Per-family notification gate: an update touching only A records is an
     # IPv4 event, only AAAA an IPv6 event. Entries without a record type
     # (e.g. "remaining records skipped" after a Cloudflare failure) always
-    # notify. If both families are involved, one combined message covers both.
-    notify_family = {"A": config.get("notify_ipv4_changes", True),
-                     "AAAA": config.get("notify_ipv6_changes", True)}
-    if results and any(notify_family.get(r["type"], True) for r in results):
+    # notify on every channel. If both families are involved, one combined
+    # message goes to the union of their enabled channels.
+    family_channels = {"A": _channels_for(config, "notify_ipv4_changes"),
+                       "AAAA": _channels_for(config, "notify_ipv6_changes")}
+    all_channels = {"discord": True, "email": True}
+    channels = _union_channels(
+        *(family_channels.get(r["type"], all_channels) for r in results))
+    if results and any(channels.values()):
         message = build_notification_message(old_ipv4, ipv4, old_ipv6, ipv6, results)
-        notify_status = _notify(config, message)
+        notify_status = _notify(config, message, channels=channels)
         config_store.update_state({"notify": notify_status})
+
+
+def check_summary_due(config):
+    """Send the scheduled summary notification when it is due, and keep the
+    next-run time in state up to date (recomputed whenever the schedule
+    settings change — the settings save wakes the poller, so a new schedule
+    takes effect immediately).
+
+    next_summary_ts persists in state.json, so a summary that came due while
+    the service was down fires on the first cycle after startup — unless the
+    user turned catch-up off, in which case it's skipped and the next
+    scheduled summary covers the gap."""
+    scfg = config.get("summary") or {}
+    state = config_store.get_state()
+    if not scfg.get("enabled"):
+        if state.get("next_summary_ts"):
+            config_store.update_state({"next_summary_ts": None,
+                                       "summary_schedule": None})
+        return
+
+    now = time.time()
+    fingerprint = summary.schedule_fingerprint(scfg)
+    next_ts = state.get("next_summary_ts")
+    if not next_ts or state.get("summary_schedule") != fingerprint:
+        next_ts = summary.next_run_ts(scfg, now)
+        config_store.update_state({"next_summary_ts": next_ts,
+                                   "summary_schedule": fingerprint})
+        log.info("Summary notification scheduled (%s); next at %s",
+                 summary.describe_schedule(scfg),
+                 time.strftime("%Y-%m-%d %H:%M", time.localtime(next_ts)))
+        return
+    if now < next_ts:
+        return
+
+    if not scfg.get("catch_up", True) and next_ts < summary.SERVICE_STARTED_TS:
+        # The summary came due while the service was off and catch-up is
+        # disabled: skip it rather than sending late. Advancing slot by slot
+        # from the missed occurrence keeps the original cadence (matters for
+        # bi-weekly); last_summary_ts stays put so the next summary still
+        # covers the skipped period.
+        new_next = next_ts
+        while new_next <= now:
+            new_next = summary.next_run_ts(scfg, new_next, just_sent=True)
+        log.info("Summary was due at %s while the service was down — skipped "
+                 "(catch-up is off); next at %s",
+                 time.strftime("%Y-%m-%d %H:%M", time.localtime(next_ts)),
+                 time.strftime("%Y-%m-%d %H:%M", time.localtime(new_next)))
+        config_store.update_state({"next_summary_ts": new_next,
+                                   "summary_schedule": fingerprint})
+        return
+
+    # Cover everything since the last summary; the very first one covers one
+    # full period back.
+    since = state.get("last_summary_ts") or (now - summary.period_seconds(scfg))
+    new_next = summary.next_run_ts(scfg, now, just_sent=True)
+    channels = {"discord": bool(scfg.get("discord", True)),
+                "email": bool(scfg.get("email", True))}
+    log.info("Sending %s summary (covering since %s)",
+             summary.frequency_label(scfg),
+             time.strftime("%Y-%m-%d %H:%M", time.localtime(since)))
+    if any(channels.values()):
+        message = summary.build_message(config, state, since, now,
+                                        next_ts=new_next)
+        notify_status = _notify(
+            config, message,
+            subject=f"DDNS: {summary.frequency_label(scfg)} summary",
+            channels=channels)
+        config_store.update_state({"notify": notify_status})
+    config_store.update_state({"last_summary_ts": now,
+                               "next_summary_ts": new_next,
+                               "summary_schedule": fingerprint})
 
 
 def poller_loop():
@@ -401,7 +513,19 @@ def poller_loop():
             log.exception("Unexpected error in poll cycle")
         first = False
 
-        interval = config_store.get_config().get("poll_interval_seconds", 300)
-        wake_event.wait(timeout=max(15, int(interval)))
+        config = config_store.get_config()
+        try:
+            check_summary_due(config)
+        except Exception:
+            log.exception("Unexpected error in summary check")
+
+        timeout = max(15, int(config.get("poll_interval_seconds", 300)))
+        if (config.get("summary") or {}).get("enabled"):
+            next_ts = config_store.get_state().get("next_summary_ts")
+            if next_ts:
+                # Cap the sleep so the summary goes out at its scheduled
+                # time, not up to a poll interval late.
+                timeout = min(timeout, max(5, next_ts - time.time() + 1))
+        wake_event.wait(timeout=timeout)
         wake_event.clear()
     log.info("Poller stopped")

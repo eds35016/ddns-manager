@@ -50,14 +50,30 @@ DEFAULT_CONFIG = {
         "from_addr": "",
         "to_addrs": [],
     },
-    # Which address-family changes trigger a notification. Disabling one
-    # never stops DNS record updates — it only silences the alerts (useful
-    # when an ISP rotates the IPv6 prefix constantly).
-    "notify_ipv4_changes": True,
-    "notify_ipv6_changes": True,
+    # Which address-family changes trigger a notification, per channel.
+    # Disabling one never stops DNS record updates — it only silences the
+    # alerts (useful when an ISP rotates the IPv6 prefix constantly).
+    "notify_ipv4_changes": {"discord": True, "email": True},
+    "notify_ipv6_changes": {"discord": True, "email": True},
     # Also alert (once per incident, plus a recovery notice) when the service
     # itself has a problem: IP lookup failing, Cloudflare unreachable, etc.
-    "notify_on_errors": True,
+    "notify_on_errors": {"discord": True, "email": True},
+    # Scheduled summary notification: recaps the period's IP changes and
+    # doubles as a proof-of-life signal that the service is still running.
+    # Times are local server time. day_of_week: 0=Monday … 6=Sunday
+    # (weekly/biweekly); day_of_month: 1–28 (monthly). catch_up: whether a
+    # summary that came due while the service was off is sent right after
+    # startup (off = skip it; the next one covers the gap).
+    "summary": {
+        "enabled": False,
+        "frequency": "weekly",  # daily | weekly | biweekly | monthly
+        "day_of_week": 6,
+        "day_of_month": 1,
+        "time": "01:00",
+        "catch_up": True,
+        "discord": True,
+        "email": True,
+    },
 }
 
 # Keys whose values must never be echoed back to the browser or logs.
@@ -80,6 +96,12 @@ _state = {
     # Active service problems, kind -> message ("ip_lookup", "cloudflare").
     # Used to alert once on failure and once on recovery, not every cycle.
     "alerts": {},
+    # Scheduled summary bookkeeping: when one was last sent, when the next
+    # is due, and a fingerprint of the schedule settings that produced
+    # next_summary_ts (so a schedule change triggers a recompute).
+    "last_summary_ts": None,
+    "next_summary_ts": None,
+    "summary_schedule": None,
 }
 
 
@@ -121,6 +143,18 @@ def _migrate_notify_flags(cfg):
     return cfg
 
 
+def _migrate_channel_flags(cfg):
+    """Older configs stored each notify flag as one boolean covering both
+    channels; upgrade to per-channel {"discord", "email"} dicts, preserving
+    the user's on/off choice for both. Must run before _merge_defaults for
+    the same reason as _migrate_notify_flags."""
+    for key in ("notify_ipv4_changes", "notify_ipv6_changes", "notify_on_errors"):
+        value = cfg.get(key)
+        if isinstance(value, bool):
+            cfg[key] = {"discord": value, "email": value}
+    return cfg
+
+
 def _migrate_webhooks(cfg):
     """Older configs stored discord_webhook_urls as a plain list of URL
     strings. Upgrade each entry to {"url", "ping_user_ids"} in place so the
@@ -146,7 +180,8 @@ def load_config():
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                 _config = _merge_defaults(
-                    _migrate_notify_flags(json.load(f)), DEFAULT_CONFIG)
+                    _migrate_channel_flags(_migrate_notify_flags(json.load(f))),
+                    DEFAULT_CONFIG)
         else:
             _config = copy.deepcopy(DEFAULT_CONFIG)
         _migrate_webhooks(_config)

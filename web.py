@@ -29,6 +29,7 @@ import cloudflare_client as cf
 import config_store
 import ip_history
 import poller
+import summary
 
 log = logging.getLogger(__name__)
 
@@ -537,6 +538,9 @@ def create_app():
                       for w in cfg.get("discord_webhook_urls", [])],
             to_addrs_joined=", ".join(cfg.get("smtp", {}).get("to_addrs", [])),
             has_smtp_password=bool(cfg.get("smtp", {}).get("password")),
+            day_names=summary.DAY_NAMES,
+            summary_next_ts=summary.display_next_ts(
+                cfg.get("summary", {}), config_store.get_state()),
         )
 
     @app.route("/settings/save", methods=["POST"])
@@ -627,9 +631,41 @@ def create_app():
         smtp_changes["to_addrs"] = to_addrs
 
         changes["smtp"] = smtp_changes
-        changes["notify_ipv4_changes"] = form.get("notify_ipv4_changes") == "on"
-        changes["notify_ipv6_changes"] = form.get("notify_ipv6_changes") == "on"
-        changes["notify_on_errors"] = form.get("notify_on_errors") == "on"
+
+        # Per-notification-type channel switches: one Discord + one email
+        # checkbox for each type.
+        def _channel_flags(prefix):
+            return {"discord": form.get(prefix + "_discord") == "on",
+                    "email": form.get(prefix + "_email") == "on"}
+
+        changes["notify_ipv4_changes"] = _channel_flags("notify_ipv4")
+        changes["notify_ipv6_changes"] = _channel_flags("notify_ipv6")
+        changes["notify_on_errors"] = _channel_flags("notify_errors")
+
+        # Scheduled summary notification.
+        frequency = form.get("summary_frequency", "weekly")
+        if frequency not in summary.FREQUENCIES:
+            errors.append("Summary frequency must be daily, weekly, "
+                          "bi-weekly, or monthly.")
+            frequency = "weekly"
+        day_of_week = _int_field(form, "summary_day_of_week",
+                                 "Summary day of week", errors, 0, 6, default=6)
+        day_of_month = _int_field(form, "summary_day_of_month",
+                                  "Summary day of month", errors, 1, 28, default=1)
+        summary_time = form.get("summary_time", "").strip() or "01:00"
+        if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", summary_time):
+            errors.append("Summary time must be HH:MM (24-hour).")
+            summary_time = "01:00"
+        changes["summary"] = {
+            "enabled": form.get("summary_enabled") == "on",
+            "frequency": frequency,
+            "day_of_week": day_of_week if day_of_week is not None else 6,
+            "day_of_month": day_of_month if day_of_month is not None else 1,
+            "time": summary_time,
+            "catch_up": form.get("summary_catch_up") == "on",
+            "discord": form.get("summary_discord") == "on",
+            "email": form.get("summary_email") == "on",
+        }
 
         if errors:
             for e in errors:

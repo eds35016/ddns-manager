@@ -22,7 +22,17 @@
     "from_addr": "ddns@yourdomain.com",
     "to_addrs": ["you@yourdomain.com", "partner@example.com"]
   },
-  "notify_ipv4_changes": true,
-  "notify_ipv6_changes": true,
-  "notify_on_errors": true
+  "notify_ipv4_changes": {"discord": true, "email": true},
+  "notify_ipv6_changes": {"discord": true, "email": true},
+  "notify_on_errors": {"discord": true, "email": true},
+  "summary": {
+    "enabled": false,
+    "frequency": "weekly (or: daily | biweekly | monthly)",
+    "day_of_week": "6 (0=Monday … 6=Sunday; used for weekly/biweekly)",
+    "day_of_month": "1 (1–28; used for monthly)",
+    "time": "01:00 (24-hour, server local time)",
+    "catch_up": "true = a summary missed while the service was off is sent right after startup; false = skip it (the next one covers the gap)",
+    "discord": true,
+    "email": true
+  }
 }

@@ -4,6 +4,10 @@
 --------------------------------------------------------------------------- */
 
 :root {
+  /* Native widgets (checkboxes, select popups, time-picker icons,
+     scrollbars) follow the active theme instead of always rendering light */
+  color-scheme: light;
+
   /* color tokens */
   --bg: #f5f6f8;
   --surface: #ffffff;
@@ -41,6 +45,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --bg: #0f1117;
     --surface: #181b23;
     --surface-2: #1f2330;
@@ -203,7 +208,7 @@ code { font-family: var(--mono); font-size: .875em; background: var(--surface-2)
 .field-checkbox label { display: flex; align-items: center; gap: var(--sp-2); font-weight: 500; font-size: var(--fs-base); }
 
 input[type="text"], input[type="password"], input[type="number"],
-input[type="email"], input[type="search"], select, textarea {
+input[type="email"], input[type="search"], input[type="time"], select, textarea {
   font: inherit; color: var(--text);
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: .55rem .75rem; min-height: 44px;
@@ -226,6 +231,25 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent);
 .reveal-toggle:hover { background: var(--surface-2); }
 
 .save-bar { margin: var(--sp-5) 0; }
+
+/* Per-notification-type channel switches (Settings) */
+.notify-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem 5.5rem;
+  align-items: center; row-gap: var(--sp-2);
+  max-width: 460px; margin-bottom: var(--sp-3);
+}
+.notify-grid-head {
+  font-size: var(--fs-sm); color: var(--text-muted); font-weight: 600;
+  text-align: center;
+}
+.notify-type { font-weight: 550; font-size: var(--fs-sm); }
+.notify-check { display: flex; justify-content: center; cursor: pointer; }
+
+/* Scheduled summary controls: consistent vertical rhythm */
+.summary-options {
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
 
 .webhook-list { list-style: none; margin: 0 0 var(--sp-3); padding: 0; }
 .webhook-list li {

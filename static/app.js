@@ -305,6 +305,26 @@
     el.addEventListener("click", function () { el.classList.toggle("expanded"); });
   });
 
+  /* ---------------------- summary schedule fields ------------------------ */
+
+  // Show only the day picker that matches the chosen frequency (day-of-week
+  // for weekly/bi-weekly, day-of-month for monthly). Hidden fields stay
+  // enabled on purpose so their saved values survive a round-trip; without
+  // JS both pickers simply show.
+  var summaryFreq = document.getElementById("summary-frequency");
+
+  function updateSummaryFields() {
+    var freq = summaryFreq.value;
+    document.querySelectorAll("[data-summary-freq]").forEach(function (el) {
+      el.hidden = el.getAttribute("data-summary-freq").split(" ").indexOf(freq) === -1;
+    });
+  }
+
+  if (summaryFreq) {
+    summaryFreq.addEventListener("change", updateSummaryFields);
+    updateSummaryFields();
+  }
+
   /* -------------------------- dashboard polling -------------------------- */
 
   var statIpv4 = document.getElementById("stat-ipv4");

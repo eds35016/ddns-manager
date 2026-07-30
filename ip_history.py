@@ -105,6 +105,19 @@ def get_page(before_id=None, limit=20, family=None):
     return rows[:limit], len(rows) > limit
 
 
+def get_ranges_since(since_ts):
+    """Every range that was active at any point since since_ts — the ranges
+    that started in the period plus, per family, the one already active when
+    the period began (ranges are contiguous, so that's any row still open or
+    ended after since_ts). Used by the scheduled summary. Raises sqlite3.Error
+    on database problems; the caller treats history as advisory."""
+    with contextlib.closing(_connect()) as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT id, family, ip, started_ts, ended_ts FROM ip_history"
+            " WHERE started_ts >= ? OR ended_ts >= ? OR ended_ts IS NULL"
+            " ORDER BY family, started_ts", (since_ts, since_ts))]
+
+
 def get_all():
     """Every range, newest first — for the CSV export."""
     with contextlib.closing(_connect()) as conn:
