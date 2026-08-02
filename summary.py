@@ -126,6 +126,28 @@ def next_run_ts(scfg, after_ts, just_sent=False):
     return cand.timestamp()
 
 
+def matches_schedule(scfg, ts):
+    """True if ts still falls on the configured wall-clock slot in the
+    current local timezone.
+
+    next_run_ts() bakes the server's UTC offset into the epoch it returns,
+    but the schedule fingerprint only captures the wall-clock settings — so
+    a stored next-run time survives a timezone change (or a DST transition
+    between now and the slot) even though it no longer lands at the
+    configured local time. Callers use this to detect that drift and
+    recompute."""
+    hh, mm = _parse_time(scfg.get("time"))
+    cand = datetime.datetime.fromtimestamp(ts)
+    if (cand.hour, cand.minute) != (hh, mm):
+        return False
+    freq = _frequency(scfg)
+    if freq in ("weekly", "biweekly"):
+        return cand.weekday() == _day_of_week(scfg)
+    if freq == "monthly":
+        return cand.day == _day_of_month(scfg)
+    return True
+
+
 def display_next_ts(scfg, state):
     """Next scheduled send for display (Settings page), or None if the
     summary is disabled. Prefers the poller's stored value; falls back to a
@@ -135,7 +157,8 @@ def display_next_ts(scfg, state):
         return None
     next_ts = state.get("next_summary_ts")
     if next_ts and next_ts > time.time() \
-            and state.get("summary_schedule") == schedule_fingerprint(scfg):
+            and state.get("summary_schedule") == schedule_fingerprint(scfg) \
+            and matches_schedule(scfg, next_ts):
         return next_ts
     return next_run_ts(scfg, time.time())
 

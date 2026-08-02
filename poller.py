@@ -450,7 +450,11 @@ def check_summary_due(config):
     now = time.time()
     fingerprint = summary.schedule_fingerprint(scfg)
     next_ts = state.get("next_summary_ts")
-    if not next_ts or state.get("summary_schedule") != fingerprint:
+    # Wall-clock validation only applies to future slots: a summary that
+    # already came due while the service was down must keep flowing into the
+    # catch-up logic below, even if the timezone changed in the meantime.
+    if not next_ts or state.get("summary_schedule") != fingerprint \
+            or (next_ts > now and not summary.matches_schedule(scfg, next_ts)):
         next_ts = summary.next_run_ts(scfg, now)
         config_store.update_state({"next_summary_ts": next_ts,
                                    "summary_schedule": fingerprint})
