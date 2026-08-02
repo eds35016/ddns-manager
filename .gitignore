@@ -3,8 +3,9 @@
 config.json
 state.json
 *.json.tmp
-history.db
-history.db.*
+# history.db* also covers SQLite sidecar files (history.db-journal, -wal,
+# -shm), which use a dash and would slip past a history.db.* pattern.
+history.db*
 
 # Python
 __pycache__/
