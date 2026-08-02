@@ -5,18 +5,48 @@ state.json
 *.json.tmp
 history.db
 history.db.*
+*.sqlite3
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 venv/
 .venv/
 env/
 *.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+MANIFEST
+*.so
+
+# Testing
+.pytest_cache/
+.coverage
+.htmlcov/
+coverage/
+
+# Linting / type checking
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pre-commit
+.pre-commit-config.yaml.bak
 
 # Editors / OS
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
+*.orig
+
+# Logs
+*.log
